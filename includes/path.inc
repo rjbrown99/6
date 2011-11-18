@@ -151,6 +151,9 @@ function _drupal_lookup_path_direct($action, $path = '', $path_language = '') {
  *   found.
  */
 function drupal_get_path_alias($path, $path_language = '') {
+  if (function_exists('path_alias_xt_get_path_alias')) {
+    return path_alias_xt_get_path_alias($path, $path_language);
+  }
   $result = $path;
   if ($alias = drupal_lookup_path('alias', $path, $path_language)) {
     $result = $alias;
