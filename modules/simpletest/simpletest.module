@@ -1,7 +1,4 @@
 <?php
-// $Id: simpletest.module,v 1.33.2.4.2.21 2009/12/14 23:27:11 boombatower Exp $
-// Core: Id: simpletest.module,v 1.71 2009/08/24 00:14:21 webchick Exp
-
 /**
  * @file
  * Backport of Drupal 7 simpletest.module with modifications, see BACKPORT.txt.

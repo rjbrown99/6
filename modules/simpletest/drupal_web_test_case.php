@@ -1,7 +1,4 @@
 <?php
-// $Id: drupal_web_test_case.php,v 1.2.2.3.2.46 2009/11/06 21:23:32 boombatower Exp $
-// Core: Id: drupal_web_test_case.php,v 1.146 2009/08/31 18:30:26 webchick Exp $
-
 /**
  * @file
  * Provide required modifications to Drupal 7 core DrupalWebTestCase in order

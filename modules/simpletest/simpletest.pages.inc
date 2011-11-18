@@ -1,6 +1,4 @@
 <?php
-// $Id: simpletest.pages.inc,v 1.1.2.2 2009/09/14 22:37:35 boombatower Exp $
-
 /**
  * @file
  * Page callbacks for simpletest module.
