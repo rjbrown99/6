@@ -1,2 +1,3 @@
 # Ignore any subversion files
 .svn
+patches/mimemail.patch
