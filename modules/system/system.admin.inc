@@ -1837,6 +1837,11 @@ function system_sql() {
  * Default page callback for batches.
  */
 function system_batch_page() {
+  // Newrelic: Do not count batch runs against our Appdex score
+  if (extension_loaded('newrelic')) { 
+    newrelic_ignore_appdex();
+  }
+
   require_once './includes/batch.inc';
   $output = _batch_page();
   if ($output === FALSE) {
