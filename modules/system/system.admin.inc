@@ -1839,7 +1839,7 @@ function system_sql() {
 function system_batch_page() {
   // Newrelic: Do not count batch runs against our Appdex score
   if (extension_loaded('newrelic')) { 
-    newrelic_ignore_appdex();
+    newrelic_ignore_apdex();
   }
 
   require_once './includes/batch.inc';
