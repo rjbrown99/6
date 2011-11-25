@@ -129,7 +129,14 @@ function db_set_active($name = 'default') {
     install_goto('install.php');
   }
 
-  if (!isset($db_conns[$name])) {
+  $real_name = $name;
+  // open a dedicated connection for watchdog entries
+  // to ensure that entries are written even if other tables locked
+  if ('dedicated_watchdog_connection' == $name) {
+    $name = 'default';
+  }
+
+  if (!isset($db_conns[$real_name])) {
     // Initiate a new connection, using the named DB URL specified.
     if (is_array($db_url)) {
       $connect_url = array_key_exists($name, $db_url) ? $db_url[$name] : $db_url['default'];
@@ -162,7 +169,7 @@ function db_set_active($name = 'default') {
       _db_error_page("The database type '". $db_type ."' is unsupported. Please use either 'mysql' or 'mysqli' for MySQL, or 'pgsql' for PostgreSQL databases.");
     }
 
-    $db_conns[$name] = db_connect($connect_url);
+    $db_conns[$real_name] = db_connect($connect_url);
     if (!empty($slave_connect_url)) {
       $db_slave_conns[$name] = db_connect($slave_connect_url); 
     }
@@ -170,8 +177,8 @@ function db_set_active($name = 'default') {
 
   $previous_name = $active_name;
   // Set the active connection.
-  $active_name = $name;
-  $active_db = $db_conns[$name];
+  $active_name = $real_name;
+  $active_db = $db_conns[$real_name];
   if (isset($db_slave_conns[$name])) {
     $active_slave_db = $db_slave_conns[$name];
   }

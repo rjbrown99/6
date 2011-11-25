@@ -129,7 +129,7 @@ function _dblog_get_message_types() {
  * Implementation of hook_watchdog().
  */
 function dblog_watchdog($log = array()) {
-  $current_db = db_set_active();
+  $current_db = db_set_active('dedicated_watchdog_connection');
   db_query("INSERT INTO {watchdog}
     (uid, type, message, variables, severity, link, location, referer, hostname, timestamp)
     VALUES
