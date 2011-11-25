@@ -47,7 +47,7 @@ define('FILE_STATUS_PERMANENT', 1);
  *   A string containing the Drupal path (i.e. path relative to the Drupal
  *   root directory) of the file to generate the URL for.
  * @return
- *   A string containing a URL that can be used to download the file.
+ *   A string containing a URL that can be used to access the file.
  */
 function file_create_url($path) {
   // Clean up Windows paths.
@@ -55,21 +55,14 @@ function file_create_url($path) {
 
   drupal_alter('file_url', $path);
 
-  // If any module has altered the path, then return the alteration.
-  if ($path != $old_path) {
+  // Return path if it was altered by any module, or if it already is a 
+  // root-relative or a protocol-relative URL. 
+  if ($path != $old_path || drupal_substr($path, 0, 1) == '/' || drupal_substr($path, 0, 2) == '//') {
     return $path;
   }
 
-  // Otherwise serve the file from Drupal's web server. This point will only
-  // be reached when either no custom_file_url_rewrite() function has been
-  // defined, or when that function returned FALSE, thereby indicating that it
-  // cannot (or doesn't wish to) rewrite the URL. This is typically because
-  // the file doesn't match some conditions to be served from a CDN or static
-  // file server, or because the file has not yet been synced to the CDN or
-  // static file server.
-
   // Shipped files.
-  if (strpos($path, file_directory_path() . '/') !== 0) {
+  if (preg_match("#^(/?)(misc|modules|sites|themes)/#i", $path) && (strpos($path, file_directory_path() . '/') !== 0)) {
     return base_path() . $path;
   }
   // Created files.
@@ -82,7 +75,9 @@ function file_create_url($path) {
         // rewritten to be served relatively to system/files (which is a menu
         // callback that streams the file) instead of relatively to the file
         // directory path.
-        $path = file_directory_strip($path);
+        if (strpos($path, file_directory_path() . '/') === 0) {
+          $path = trim(substr($path, strlen(file_directory_path())), '\\/');
+        }
         return url('system/files/' . $path, array('absolute' => TRUE));
     }
   }
@@ -1067,23 +1062,6 @@ function file_directory_temp() {
  */
 function file_directory_path() {
   return variable_get('file_directory_path', conf_path() .'/files');
-}
-
-/**
- * Remove a possible leading file directory path from the given path.
- *
- * @param $path
- *   Path to a file that may be in Drupal's files directory.
- * @return
- *   String with Drupal's files directory removed from it.
- */
-function file_directory_strip($path) {
-  // Strip file_directory_path from $path. We only include relative paths in
-  // URLs.
-  if (strpos($path, file_directory_path() . '/') === 0) {
-    $path = trim(substr($path, strlen(file_directory_path())), '\\/');
-  }
-  return $path;
 }
 
 /**
