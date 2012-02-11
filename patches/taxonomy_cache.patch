@@ -1,8 +1,30 @@
 Index: modules/taxonomy/taxonomy.module
 ===================================================================
---- modules/taxonomy/taxonomy.module	(revision 1813)
+--- modules/taxonomy/taxonomy.module	(revision 1846)
 +++ modules/taxonomy/taxonomy.module	(working copy)
-@@ -632,16 +632,28 @@
+@@ -469,8 +469,10 @@
+  *
+  * @param $type
+  *   If set, return only those vocabularies associated with this node type.
++ * @param $reset
++ *   If set, reset the cache for this vocabulary.
+  */
+-function taxonomy_get_vocabularies($type = NULL) {
++function taxonomy_get_vocabularies($type = NULL, $reset = FALSE) {
+   static $vocabularies_cache = array();
+   static $vocabularies_null;
+   
+@@ -501,6 +503,9 @@
+       $voc->nodes = array();
+     }
+     $vocabularies[$voc->vid] = $voc;
++    if ($reset) {
++      cache_set('vocabulary::'. $vid, $voc, 'cache_taxonomy');
++    }
+   }
+ 
+   if ($type) {
+@@ -648,16 +653,28 @@
  function taxonomy_node_get_terms($node, $key = 'tid', $reset = FALSE) {
    static $terms;
  
@@ -22,7 +44,7 @@ Index: modules/taxonomy/taxonomy.module
 +    // refresh will set the permissions for everyone. If you are using a module
 +    // that does query rewriting on taxonomy queries, don't use this patch.
 +    // If you're not sure whether or not this is the case, don't use this patch!
-+    if ($cache = cache_get($cache_key, 'cache_taxonomy')) {
++    if ($cache) {
 +      $terms[$node->vid][$key] = $cache->data;
      }
 +    else {
@@ -36,7 +58,7 @@ Index: modules/taxonomy/taxonomy.module
    }
    return $terms[$node->vid][$key];
  }
-@@ -848,6 +860,16 @@
+@@ -864,6 +881,16 @@
  function taxonomy_get_tree($vid, $parent = 0, $depth = -1, $max_depth = NULL) {
    static $children, $parents, $terms;
  
@@ -53,7 +75,7 @@ Index: modules/taxonomy/taxonomy.module
    // We cache trees, so it's not CPU-intensive to call get_tree() on a term
    // and its children, too.
    if (!isset($children[$vid])) {
-@@ -919,6 +941,10 @@
+@@ -935,6 +962,10 @@
      }
    }
  
@@ -64,45 +86,21 @@ Index: modules/taxonomy/taxonomy.module
    return $tree;
  }
  
-@@ -1049,19 +1075,25 @@
+@@ -1065,7 +1096,12 @@
    }
  
    if (!isset($vocabularies[$vid])) {
--    // Initialize so if this vocabulary does not exist, we have
--    // that cached, and we will not try to load this later.
--    $vocabularies[$vid] = FALSE;
--    // Try to load the data and fill up the object.
--    $result = db_query('SELECT v.*, n.type FROM {vocabulary} v LEFT JOIN {vocabulary_node_types} n ON v.vid = n.vid WHERE v.vid = %d', $vid);
--    $node_types = array();
--    while ($voc = db_fetch_object($result)) {
--      if (!empty($voc->type)) {
--        $node_types[$voc->type] = $voc->type;
+-    $vocabularies = taxonomy_get_vocabularies();
 +    if ($cache = cache_get('vocabulary::'. $vid, 'cache_taxonomy')) {
 +      $vocabularies[$vid] = $cache->data;
 +    }
 +    else {
-+      // Initialize so if this vocabulary does not exist, we have
-+      // that cached, and we will not try to load this later.
-+      $vocabularies[$vid] = FALSE;
-+      // Try to load the data and fill up the object.
-+      $result = db_query('SELECT v.*, n.type FROM {vocabulary} v LEFT JOIN {vocabulary_node_types} n ON v.vid = n.vid WHERE v.vid = %d', $vid);
-+      $node_types = array();
-+      while ($voc = db_fetch_object($result)) {
-+        if (!empty($voc->type)) {
-+          $node_types[$voc->type] = $voc->type;
-+        }
-+        unset($voc->type);
-+        $voc->nodes = $node_types;
-+        $vocabularies[$vid] = $voc;
-+        cache_set('vocabulary::'. $vid, $voc, 'cache_taxonomy');
-       }
--      unset($voc->type);
--      $voc->nodes = $node_types;
--      $vocabularies[$vid] = $voc;
-     }
++      $vocabularies = taxonomy_get_vocabularies(NULL, TRUE);
++    }
    }
  
-@@ -1088,7 +1120,13 @@
+   // Return FALSE if this vocabulary does not exist.
+@@ -1091,7 +1127,13 @@
    }
  
    if (!isset($terms[$tid])) {
