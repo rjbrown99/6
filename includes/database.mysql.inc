@@ -76,7 +76,7 @@ function db_connect($url) {
   $connection = @mysql_connect($url['host'], $url['user'], $url['pass'], TRUE, 2);
   if (!$connection || !mysql_select_db(substr($url['path'], 1))) {
     // Show error screen otherwise
-    _db_error_page(mysql_error());
+    return array(FALSE, mysql_error());
   }
 
   // Force MySQL to use the UTF-8 character set. Also set the collation, if a
@@ -89,7 +89,7 @@ function db_connect($url) {
     mysql_query('SET NAMES utf8', $connection);
   }
 
-  return $connection;
+  return array(TRUE, $connection);
 }
 
 /**
@@ -223,7 +223,7 @@ function db_fetch_array($result) {
  *
  * @param $result
  *   A database query result resource, as returned from db_query().
- * 
+ *
  * @return
  *   The resulting field or FALSE.
  */
