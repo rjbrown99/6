@@ -126,7 +126,7 @@ function db_set_active($name = 'default') {
   static $db_conns, $db_slave_conns, $active_name = FALSE;
 
   if (empty($db_url)) {
-    include_once 'includes/install.inc';
+    include_once DRUPAL_ROOT . '/includes/install.inc';
     install_goto('install.php');
   }
 
@@ -161,7 +161,7 @@ function db_set_active($name = 'default') {
     }
 
     $db_type = substr($connect_url, 0, strpos($connect_url, '://'));
-    $handler = "./includes/database.$db_type.inc";
+    $handler = DRUPAL_ROOT . "/includes/database.$db_type.inc";
 
     if (is_file($handler)) {
       include_once $handler;

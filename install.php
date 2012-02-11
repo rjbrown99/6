@@ -1,6 +1,11 @@
 <?php
 
-require_once './includes/install.inc';
+/**
+ * Root directory of Drupal installation.
+ */
+define('DRUPAL_ROOT', getcwd());
+
+require_once DRUPAL_ROOT . '/includes/install.inc';
 
 define('MAINTENANCE_MODE', 'install');
 
@@ -16,7 +21,7 @@ define('MAINTENANCE_MODE', 'install');
  *   The installation phase we should proceed to.
  */
 function install_main() {
-  require_once './includes/bootstrap.inc';
+  require_once DRUPAL_ROOT . '/includes/bootstrap.inc';
   drupal_bootstrap(DRUPAL_BOOTSTRAP_CONFIGURATION);
 
   // The user agent header is used to pass a database prefix in the request when
@@ -30,8 +35,8 @@ function install_main() {
   // This must go after drupal_bootstrap(), which unsets globals!
   global $profile, $install_locale, $conf;
 
-  require_once './modules/system/system.install';
-  require_once './includes/file.inc';
+  require_once DRUPAL_ROOT . '/modules/system/system.install';
+  require_once DRUPAL_ROOT . '/includes/file.inc';
 
   // Ensure correct page headers are sent (e.g. caching)
   drupal_page_header();
@@ -40,7 +45,7 @@ function install_main() {
   drupal_init_language();
 
   // Load module basics (needed for hook invokes).
-  include_once './includes/module.inc';
+  include_once DRUPAL_ROOT . '/includes/module.inc';
   $module_list['system']['filename'] = 'modules/system/system.module';
   $module_list['filter']['filename'] = 'modules/filter/filter.module';
   module_list(TRUE, FALSE, FALSE, $module_list);
@@ -56,7 +61,7 @@ function install_main() {
   // continue using the cache implementation they started with) and also
   // because any data put in the cache during the installer is inherently
   // suspect, due to the fact that Drupal is not fully set up yet.
-  require_once './includes/cache-install.inc';
+  require_once DRUPAL_ROOT . '/includes/cache-install.inc';  
   $conf['cache_inc'] = './includes/cache-install.inc';
 
   // Install profile chosen, set the global immediately.
@@ -74,7 +79,7 @@ function install_main() {
 
   if ($verify) {
     // Establish a connection to the database.
-    require_once './includes/database.inc';
+    require_once DRUPAL_ROOT . '/includes/database.inc';
     db_set_active();
 
     // Check if Drupal is installed.
@@ -98,7 +103,7 @@ function install_main() {
   }
 
   // Load the profile.
-  require_once "./profiles/$profile/$profile.profile";
+  require_once DRUPAL_ROOT . "/profiles/$profile/$profile.profile";
 
   // Locale selection
   if (!empty($_GET['locale'])) {
@@ -176,7 +181,7 @@ function install_verify_settings() {
   // Verify existing settings (if any).
   if (!empty($db_url)) {
     // We need this because we want to run form_get_errors.
-    include_once './includes/form.inc';
+    include_once DRUPAL_ROOT . '/includes/form.inc';
 
     $url = parse_url(is_array($db_url) ? $db_url['default'] : $db_url);
     $db_user = urldecode($url['user']);
@@ -211,7 +216,7 @@ function install_change_settings($profile = 'default', $install_locale = '') {
   $settings_file = $conf_path .'/settings.php';
 
   // We always need this because we want to run form_get_errors.
-  include_once './includes/form.inc';
+  include_once DRUPAL_ROOT . '/includes/form.inc';
   install_task_list('database');
 
   $output = drupal_get_form('install_settings_form', $profile, $install_locale, $settings_file, $db_url, $db_type, $db_prefix, $db_user, $db_pass, $db_host, $db_port, $db_path);
@@ -438,13 +443,13 @@ function install_find_profiles() {
  *   The selected profile.
  */
 function install_select_profile() {
-  include_once './includes/form.inc';
+  include_once DRUPAL_ROOT . '/includes/form.inc';
 
   $profiles = install_find_profiles();
   // Don't need to choose profile if only one available.
   if (sizeof($profiles) == 1) {
     $profile = array_pop($profiles);
-    require_once $profile->filename;
+    require_once DRUPAL_ROOT . '/' . $profile->filename;
     return $profile->name;
   }
   elseif (sizeof($profiles) > 1) {
@@ -475,7 +480,7 @@ function install_select_profile_form(&$form_state, $profile_files) {
   $names = array();
 
   foreach ($profile_files as $profile) {
-    include_once($profile->filename);
+    include_once DRUPAL_ROOT . '/' . $profile->filename;
 
     // Load profile details and store them for later retrieval.
     $function = $profile->name .'_profile_details';
@@ -525,8 +530,8 @@ function install_find_locales($profilename) {
  *   The selected language.
  */
 function install_select_locale($profilename) {
-  include_once './includes/file.inc';
-  include_once './includes/form.inc';
+  include_once DRUPAL_ROOT . '/includes/file.inc';
+  include_once DRUPAL_ROOT . '/includes/form.inc';
 
   // Find all available locales.
   $locales = install_find_locales($profilename);
@@ -592,7 +597,7 @@ function install_select_locale($profilename) {
  * Form API array definition for language selection.
  */
 function install_select_locale_form(&$form_state, $locales) {
-  include_once './includes/locale.inc';
+  include_once DRUPAL_ROOT . '/includes/locale.inc';
   $languages = _locale_get_predefined_list();
   foreach ($locales as $locale) {
     // Try to use verbose locale name
@@ -686,14 +691,14 @@ function install_tasks($profile, $task) {
   // to the same address, until the batch finished callback is invoked
   // and the task advances to 'locale-initial-import'.
   if ($task == 'profile-install-batch') {
-    include_once 'includes/batch.inc';
+    include_once DRUPAL_ROOT . '/includes/batch.inc';    
     $output = _batch_page();
   }
 
   // Import interface translations for the enabled modules.
   if ($task == 'locale-initial-import') {
     if (!empty($install_locale) && ($install_locale != 'en')) {
-      include_once 'includes/locale.inc';
+      include_once DRUPAL_ROOT . '/includes/locale.inc';
       // Enable installation language as default site language.
       locale_add_language($install_locale, NULL, NULL, NULL, NULL, NULL, 1, TRUE);
       // Collect files to import for this language.
@@ -712,8 +717,8 @@ function install_tasks($profile, $task) {
     $task = 'configure';
   }
   if ($task == 'locale-initial-batch') {
-    include_once 'includes/batch.inc';
-    include_once 'includes/locale.inc';
+    include_once DRUPAL_ROOT . '/includes/batch.inc';
+    include_once DRUPAL_ROOT . '/includes/locale.inc';
     $output = _batch_page();
   }
 
@@ -786,7 +791,7 @@ if (Drupal.jsEnabled) {
   // control and proceed with importing the remaining translations.
   if ($task == 'profile-finished') {
     if (!empty($install_locale) && ($install_locale != 'en')) {
-      include_once 'includes/locale.inc';
+      include_once DRUPAL_ROOT . '/includes/locale.inc';      
       // Collect files to import for this language. Skip components
       // already covered in the initial batch set.
       $batch = locale_batch_by_language($install_locale, '_install_locale_remaining_batch_finished', variable_get('install_locale_batch_components', array()));
@@ -804,8 +809,8 @@ if (Drupal.jsEnabled) {
     $task = 'finished';
   }
   if ($task == 'locale-remaining-batch') {
-    include_once 'includes/batch.inc';
-    include_once 'includes/locale.inc';
+    include_once DRUPAL_ROOT . '/includes/batch.inc';
+    include_once DRUPAL_ROOT . '/includes/locale.inc';
     $output = _batch_page();
   }
 
