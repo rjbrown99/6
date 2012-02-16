@@ -3552,6 +3552,18 @@ function drupal_write_record($table, &$object, $update = array()) {
         $values[] = serialize($object->$field);
       }
     }
+    else if ((property_exists($object,$field)) && (is_null($object->$field))) {
+      // handle special case: setting a field to NULL
+      $fields[] = $field;
+      if (empty($info['serialize'])) {
+        $placeholders[] = '%s';
+        $values[] = 'NULL';
+      }
+      else {
+        $placeholders[] = db_type_placeholder($info['type']);
+        $values[] = serialize($object->$field);
+      }
+    }
   }
 
   // Build the SQL.
