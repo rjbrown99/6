@@ -1048,7 +1048,7 @@ function valid_url($url, $absolute = FALSE) {
  *   The name of an event.
  */
 function flood_register_event($name) {
-  db_query("INSERT INTO {flood} (event, hostname, timestamp) VALUES ('%s', '%s', %d)", $name, ip_address(), time());
+  db_query("INSERT INTO {flood} (event, hostname, timestamp) VALUES ('%s', '%s', %d)", $name, ip_address(), REQUEST_TIME);
 }
 
 /**
@@ -1065,7 +1065,7 @@ function flood_register_event($name) {
  *   True if the user did not exceed the hourly threshold. False otherwise.
  */
 function flood_is_allowed($name, $threshold) {
-  $number = db_result(db_query("SELECT COUNT(*) FROM {flood} WHERE event = '%s' AND hostname = '%s' AND timestamp > %d", $name, ip_address(), time() - 3600));
+  $number = db_result(db_query("SELECT COUNT(*) FROM {flood} WHERE event = '%s' AND hostname = '%s' AND timestamp > %d", $name, ip_address(), REQUEST_TIME - 3600));
   return ($number < $threshold ? TRUE : FALSE);
 }
 
@@ -2329,7 +2329,7 @@ function drupal_get_js($scope = 'header', $javascript = NULL) {
         // Additionally, go through any remaining scripts if JS preprocessing is on and output the non-cached ones.
         foreach ($data as $path => $info) {
           if (!$info['preprocess'] || !$is_writable || !$preprocess_js) {
-            $no_preprocess[$type] .= '<script type="text/javascript"'. ($info['defer'] ? ' defer="defer"' : '') .' src="'. file_create_url($path) . ($info['cache'] ? $query_string : '?'. time()) ."\"></script>\n";
+            $no_preprocess[$type] .= '<script type="text/javascript"'. ($info['defer'] ? ' defer="defer"' : '') .' src="'. file_create_url($path) . ($info['cache'] ? $query_string : '?'. REQUEST_TIME) ."\"></script>\n";
           }
           else {
             $files[$path] = $info;
@@ -2727,7 +2727,7 @@ function page_set_cache() {
         'cid' => $base_root . request_uri(),
         'data' => $data,
         'expire' => $cache_lifetime > 0 ? $cache_lifetime : CACHE_TEMPORARY,
-        'created' => $_SERVER['REQUEST_TIME'],
+        'created' => REQUEST_TIME,
         'headers' => array(),
       );
     
@@ -2759,7 +2759,7 @@ function drupal_cron_run() {
   $semaphore = variable_get('cron_semaphore', FALSE);
 
   if ($semaphore) {
-    if (time() - $semaphore > 3600) {
+    if (REQUEST_TIME - $semaphore > 3600) {
       // Either cron has been running for more than an hour or the semaphore
       // was not reset due to a database error.
       watchdog('cron', 'Cron has been running for more than an hour and is most likely stuck.', array(), WATCHDOG_ERROR);
@@ -2777,13 +2777,13 @@ function drupal_cron_run() {
     register_shutdown_function('drupal_cron_cleanup');
 
     // Lock cron semaphore
-    variable_set('cron_semaphore', time());
+    variable_set('cron_semaphore', REQUEST_TIME);
 
     // Iterate through the modules calling their cron handlers (if any):
     module_invoke_all('cron');
 
     // Record cron time
-    variable_set('cron_last', time());
+    variable_set('cron_last', REQUEST_TIME);
     watchdog('cron', 'Cron run completed.', array(), WATCHDOG_NOTICE);
 
     // Release cron semaphore

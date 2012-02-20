@@ -40,7 +40,7 @@ function update_get_projects() {
       // Allow other modules to alter projects before fetching and comparing.
       drupal_alter('update_projects', $projects);
       // Cache the site's project data for at most 1 hour.
-      _update_cache_set('update_project_projects', $projects, time() + 3600);
+      _update_cache_set('update_project_projects', $projects, REQUEST_TIME + 3600);
     }
   }
   return $projects;
@@ -618,7 +618,7 @@ function update_calculate_project_data($available) {
   drupal_alter('update_status', $projects);
 
   // Cache the site's update status for at most 1 hour.
-  _update_cache_set('update_project_data', $projects, time() + 3600);
+  _update_cache_set('update_project_data', $projects, REQUEST_TIME + 3600);
   return $projects;
 }
 
@@ -662,7 +662,7 @@ function update_project_cache($cid) {
   }
   else {
     $cache = _update_cache_get($cid);
-    if (!empty($cache->data) && $cache->expire > time()) {
+    if (!empty($cache->data) && $cache->expire > REQUEST_TIME) {
       $projects = $cache->data;
     }
   }

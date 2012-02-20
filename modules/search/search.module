@@ -621,7 +621,7 @@ function search_index($sid, $type, $text) {
  *   The nid of the node that needs reindexing.
  */
 function search_touch_node($nid) {
-  db_query("UPDATE {search_dataset} SET reindex = %d WHERE sid = %d AND type = 'node'", time(), $nid);
+  db_query("UPDATE {search_dataset} SET reindex = %d WHERE sid = %d AND type = 'node'", REQUEST_TIME, $nid);
 }
 
 /**

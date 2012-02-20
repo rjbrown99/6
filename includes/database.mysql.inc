@@ -113,7 +113,7 @@ function _db_query($query, $debug = 0, $slave = FALSE) {
   // db_set_ignore_slave() function to set $_SESSION['ignore_slave_server'] to
   // the timestamp after which the slave can be re-enabled.
   if (isset($_SESSION['ignore_slave_server'])) {
-    if ($_SESSION['ignore_slave_server'] >= $_SERVER['REQUEST_TIME']) {
+    if ($_SESSION['ignore_slave_server'] >= REQUEST_TIME) {
       $slave = FALSE;
     }
     else {

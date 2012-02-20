@@ -12,7 +12,7 @@
  * Nodes changed after this time may be marked new, updated, or read, depending
  * on their state for the current user. Defaults to 30 days ago.
  */
-define('NODE_NEW_LIMIT', time() - 30 * 24 * 60 * 60);
+define('NODE_NEW_LIMIT', REQUEST_TIME - 30 * 24 * 60 * 60);
 
 define('NODE_BUILD_NORMAL', 0);
 define('NODE_BUILD_PREVIEW', 1);
@@ -164,10 +164,10 @@ function node_tag_new($nid) {
 
   if ($user->uid) {
     if (node_last_viewed($nid)) {
-      db_query('UPDATE {history} SET timestamp = %d WHERE uid = %d AND nid = %d', time(), $user->uid, $nid);
+      db_query('UPDATE {history} SET timestamp = %d WHERE uid = %d AND nid = %d', REQUEST_TIME, $user->uid, $nid);
     }
     else {
-      @db_query('INSERT INTO {history} (uid, nid, timestamp) VALUES (%d, %d, %d)', $user->uid, $nid, time());
+      @db_query('INSERT INTO {history} (uid, nid, timestamp) VALUES (%d, %d, %d)', $user->uid, $nid, REQUEST_TIME);
     }
   }
 }
@@ -863,7 +863,7 @@ function node_submit($node) {
       $node->uid = 0;
     }
   }
-  $node->created = !empty($node->date) ? strtotime($node->date) : time();
+  $node->created = !empty($node->date) ? strtotime($node->date) : REQUEST_TIME;
   $node->validated = TRUE;
 
   return $node;
@@ -910,7 +910,7 @@ function node_save(&$node) {
     $node->old_vid = $node->vid;
   }
 
-  $time = time();
+  $time = REQUEST_TIME;
   if (empty($node->created)) {
     $node->created = $time;
   }
@@ -1172,7 +1172,7 @@ function node_search($op = 'search', $keys = NULL) {
       return t('Content');
 
     case 'reset':
-      db_query("UPDATE {search_dataset} SET reindex = %d WHERE type = 'node'", time());
+      db_query("UPDATE {search_dataset} SET reindex = %d WHERE type = 'node'", REQUEST_TIME);
       return;
 
     case 'status':

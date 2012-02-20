@@ -221,6 +221,11 @@ define('LANGUAGE_LTR', 0);
  */
 define('LANGUAGE_RTL', 1);
 
+/**
+ * For convenience, define a short form of the request time global.
+ */
+define ('REQUEST_TIME', (int) $_SERVER['REQUEST_TIME']);
+
 // Hide E_DEPRECATED messages.
 if (defined('E_DEPRECATED')) {
   error_reporting(error_reporting() & ~E_DEPRECATED);
@@ -952,9 +957,9 @@ function drupal_page_header() {
   $headers_sent = TRUE;
 
   $default_headers = array(
-    'Last-Modified' => gmdate(DATE_RFC1123, $_SERVER['REQUEST_TIME']),
+    'Last-Modified' => gmdate(DATE_RFC1123, REQUEST_TIME),
     'Cache-Control' => 'no-cache, must-revalidate, post-check=0, pre-check=0',
-    'ETag' => '"' . $_SERVER['REQUEST_TIME'] . '"',
+    'ETag' => '"' . REQUEST_TIME . '"',
   );
   drupal_send_headers($default_headers);
 }
@@ -971,7 +976,7 @@ function drupal_page_cache_header_external() {
 
   $max_age = variable_get('page_cache_max_age', 0);
   drupal_set_header('Cache-Control', 'public, max-age=' . $max_age);
-  drupal_set_header('Last-Modified', gmdate(DATE_RFC1123, $_SERVER['REQUEST_TIME']));
+  drupal_set_header('Last-Modified', gmdate(DATE_RFC1123, REQUEST_TIME));
 
   // HTTP/1.0 proxies do not support the Vary header, so prevent any caching
   // by sending an Expires date in the past. HTTP/1.1 clients ignores the
@@ -1261,7 +1266,7 @@ function watchdog($type, $message, $variables = array(), $severity = WATCHDOG_NO
     'request_uri' => $base_root . request_uri(),
     'referer'     => referer_uri(),
     'ip'          => ip_address(),
-    'timestamp'   => time(),
+    'timestamp'   => REQUEST_TIME,
     );
 
   // Call the logging hooks to log/process the message

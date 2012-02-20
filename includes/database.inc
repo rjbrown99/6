@@ -756,6 +756,6 @@ function db_ignore_slave() {
     // Set session variable with amount of time to delay before using slave.
     // This will stick around for 5 minutes by default. 
     // There is another $_Session variable 'not_slavesafe' for single queries.
-    $_SESSION['ignore_slave_server'] = $_SERVER['REQUEST_TIME'] + $duration;
+    $_SESSION['ignore_slave_server'] = REQUEST_TIME + $duration;
   }
 }

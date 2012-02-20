@@ -297,7 +297,7 @@ function update_cron() {
   $interval = 60 * 60 * 24 * $frequency;
   // Cron should check for updates if there is no update data cached or if the
   // configured update interval has elapsed.
-  if (!_update_cache_get('update_available_releases') || ((time() - variable_get('update_last_check', 0)) > $interval)) {
+  if (!_update_cache_get('update_available_releases') || ((REQUEST_TIME - variable_get('update_last_check', 0)) > $interval)) {
     update_refresh();
     _update_cron_notify();
   }
@@ -362,7 +362,7 @@ function update_get_available($refresh = FALSE) {
       break;
     }
   }
-  if (!$needs_refresh && ($cache = _update_cache_get('update_available_releases')) && $cache->expire > time()) {
+  if (!$needs_refresh && ($cache = _update_cache_get('update_available_releases')) && $cache->expire > REQUEST_TIME) {
     $available = $cache->data;
   }
   elseif ($needs_refresh || $refresh) {
@@ -549,7 +549,7 @@ function _update_cache_set($cid, $data, $expire) {
     $data = serialize($data);
     $serialized = 1;
   }
-  $created = time();
+  $created = REQUEST_TIME;
   db_query("UPDATE {cache_update} SET data = %b, created = %d, expire = %d, serialized = %d WHERE cid = '%s'", $data, $created, $expire, $serialized, $cid);
   if (!db_affected_rows()) {
     @db_query("INSERT INTO {cache_update} (cid, data, created, expire, serialized) VALUES ('%s', %b, %d, %d, %d)", $cid, $data, $created, $expire, $serialized);

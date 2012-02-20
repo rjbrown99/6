@@ -476,7 +476,7 @@ function simpletest_script_reporter_init() {
     echo "\n";
   }
 
-  echo "Test run started: " . format_date($_SERVER['REQUEST_TIME'], 'long') . "\n";
+  echo "Test run started: " . format_date(REQUEST_TIME, 'long') . "\n";
   timer_start('run-tests');
   echo "\n";
 

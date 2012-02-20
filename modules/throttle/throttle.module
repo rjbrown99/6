@@ -66,13 +66,13 @@ function throttle_exit() {
     $throttle = throttle_status();
 
     if ($max_guests = variable_get('throttle_anonymous', 0)) {
-      $guests = sess_count(time() - $time_period, TRUE);
+      $guests = sess_count(REQUEST_TIME - $time_period, TRUE);
     }
     else {
       $guests = 0;
     }
     if ($max_users = variable_get('throttle_user', 0)) {
-      $users = sess_count(time() - $time_period, FALSE);
+      $users = sess_count(REQUEST_TIME - $time_period, FALSE);
     }
     else {
       $users = 0;

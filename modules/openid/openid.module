@@ -365,7 +365,7 @@ function openid_association($op_endpoint) {
   module_load_include('inc', 'openid');
 
   // Remove Old Associations:
-  db_query("DELETE FROM {openid_association} WHERE created + expires_in < %d", time());
+  db_query("DELETE FROM {openid_association} WHERE created + expires_in < %d", REQUEST_TIME);
 
   // Check to see if we have an association for this IdP already
   $assoc_handle = db_result(db_query("SELECT assoc_handle FROM {openid_association} WHERE idp_endpoint_uri = '%s'", $op_endpoint));
@@ -397,7 +397,7 @@ function openid_association($op_endpoint) {
       $assoc_response['mac_key'] = base64_encode(_openid_dh_xorsecret($shared, $enc_mac_key));
     }
     db_query("INSERT INTO {openid_association} (idp_endpoint_uri, session_type, assoc_handle, assoc_type, expires_in, mac_key, created) VALUES('%s', '%s', '%s', '%s', %d, '%s', %d)",
-             $op_endpoint, $assoc_response['session_type'], $assoc_response['assoc_handle'], $assoc_response['assoc_type'], $assoc_response['expires_in'], $assoc_response['mac_key'], time());
+             $op_endpoint, $assoc_response['session_type'], $assoc_response['assoc_handle'], $assoc_response['assoc_type'], $assoc_response['expires_in'], $assoc_response['mac_key'], REQUEST_TIME);
 
     $assoc_handle = $assoc_response['assoc_handle'];
   }
@@ -673,5 +673,5 @@ function openid_verify_assertion_nonce($service, $response) {
  * Implementation of hook_cron().
  */
 function openid_cron() {
-  db_query("DELETE FROM {openid_nonce} WHERE expires < %d", time());
+  db_query("DELETE FROM {openid_nonce} WHERE expires < %d", REQUEST_TIME);
 }

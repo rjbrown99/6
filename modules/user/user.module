@@ -232,7 +232,7 @@ function user_save($account, $array = array(), $category = 'account') {
     // Consider users edited by an administrator as logged in, if they haven't
     // already, so anonymous users can view the profile (if allowed).
     if (empty($array['access']) && empty($account->access) && user_access('administer users')) {
-      $array['access'] = time();
+      $array['access'] = REQUEST_TIME;
     }
     foreach ($array as $key => $value) {
       if ($key == 'pass' && !empty($value)) {
@@ -305,12 +305,12 @@ function user_save($account, $array = array(), $category = 'account') {
   else {
     // Allow 'created' to be set by the caller.
     if (!isset($array['created'])) {
-      $array['created'] = time();
+      $array['created'] = REQUEST_TIME;
     }
     // Consider users created by an administrator as already logged in, so
     // anonymous users can view the profile (if allowed).
     if (empty($array['access']) && user_access('administer users')) {
-      $array['access'] = time();
+      $array['access'] = REQUEST_TIME;
     }
 
     // Note: we wait to save the data column to prevent module-handled
@@ -647,7 +647,7 @@ function user_user($type, &$edit, &$account, $category = NULL) {
     $account->content['summary']['member_for'] = array(
       '#type' => 'user_profile_item',
       '#title' => t('Member for'),
-      '#value' => format_interval(time() - $account->created),
+      '#value' => format_interval(REQUEST_TIME - $account->created),
     );
   }
   if ($type == 'form' && $category == 'account') {
@@ -782,7 +782,7 @@ function user_block($op = 'list', $delta = 0, $edit = array()) {
       case 3:
         if (user_access('access content')) {
           // Count users active within the defined period.
-          $interval = time() - variable_get('user_block_seconds_online', 900);
+          $interval = REQUEST_TIME - variable_get('user_block_seconds_online', 900);
 
           // Perform database queries to gather online user lists.  We use s.timestamp
           // rather than u.access because it is much faster.
@@ -1406,7 +1406,7 @@ function user_authenticate_finalize(&$edit) {
   watchdog('user', 'Session opened for %name.', array('%name' => $user->name));
   // Update the user table timestamp noting user has logged in.
   // This is also used to invalidate one-time login links.
-  $user->login = time();
+  $user->login = REQUEST_TIME;
   db_query("UPDATE {users} SET login = %d WHERE uid = %d", $user->login, $user->uid);
 
   // This is called before hook_user in case one of those functions fails
@@ -1450,7 +1450,7 @@ function user_external_login_register($name, $module) {
       'init' => $name,
       'status' => 1,
       "authname_$module" => $name,
-      'access' => time()
+      'access' => REQUEST_TIME 
     );
     $account = user_save('', $userinfo);
     // Terminate if an error occured during user_save().
@@ -1474,7 +1474,7 @@ function user_external_login_register($name, $module) {
  *   they can change their password.
  */
 function user_pass_reset_url($account) {
-  $timestamp = time();
+  $timestamp = REQUEST_TIME;
   return url("user/reset/$account->uid/$timestamp/". user_pass_rehash($account->pass, $timestamp, $account->login), array('absolute' => TRUE));
 }
 
@@ -2141,7 +2141,7 @@ function user_mail_tokens($account, $language) {
     '!uri' => $base_url,
     '!uri_brief' => preg_replace('!^https?://!', '', $base_url),
     '!mailto' => $account->mail,
-    '!date' => format_date(time(), 'medium', '', NULL, $language->language),
+    '!date' => format_date(REQUEST_TIME, 'medium', '', NULL, $language->language),
     '!login_uri' => url('user', array('absolute' => TRUE, 'language' => $language)),
     '!edit_uri' => url('user/'. $account->uid .'/edit', array('absolute' => TRUE, 'language' => $language)),
   );

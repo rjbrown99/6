@@ -27,7 +27,7 @@ function ping_cron() {
   global $base_url;
 
   if (variable_get('site_name', 0)) {
-    $cron_last = variable_get('cron_last', time());
+    $cron_last = variable_get('cron_last', REQUEST_TIME);
     // Query changed first since usually changed >= created.
     if (db_result(db_query_range('SELECT 1 FROM {node} WHERE status = 1 AND changed > %d', $cron_last, 0, 1)) || db_result(db_query_range('SELECT 1 FROM {node} WHERE status = 1 AND created > %d', $cron_last, 0, 1))) {
       _ping_notify(variable_get('site_name', ''), $base_url);

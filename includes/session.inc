@@ -103,18 +103,18 @@ function sess_write($key, $value) {
     return TRUE;
   }
 
-  db_query("UPDATE {sessions} SET uid = %d, cache = %d, hostname = '%s', session = '%s', timestamp = %d WHERE sid = '%s'", $user->uid, isset($user->cache) ? $user->cache : '', ip_address(), $value, time(), $key);
+  db_query("UPDATE {sessions} SET uid = %d, cache = %d, hostname = '%s', session = '%s', timestamp = %d WHERE sid = '%s'", $user->uid, isset($user->cache) ? $user->cache : '', ip_address(), $value, REQUEST_TIME, $key);
   if (db_affected_rows()) {
     // Last access time is updated no more frequently than once every 180 seconds.
     // This reduces contention in the users table.
-    if ($user->uid && time() - $user->access > variable_get('session_write_interval', 180)) {
-      db_query("UPDATE {users} SET access = %d WHERE uid = %d", time(), $user->uid);
+    if ($user->uid && REQUEST_TIME - $user->access > variable_get('session_write_interval', 180)) {
+      db_query("UPDATE {users} SET access = %d WHERE uid = %d", REQUEST_TIME, $user->uid);
     }
   }
   else {
     // If this query fails, another parallel request probably got here first.
     // In that case, any session data generated in this request is discarded.
-    @db_query("INSERT INTO {sessions} (sid, uid, cache, hostname, session, timestamp) VALUES ('%s', %d, %d, '%s', '%s', %d)", $key, $user->uid, isset($user->cache) ? $user->cache : '', ip_address(), $value, time());
+    @db_query("INSERT INTO {sessions} (sid, uid, cache, hostname, session, timestamp) VALUES ('%s', %d, %d, '%s', '%s', %d)", $key, $user->uid, isset($user->cache) ? $user->cache : '', ip_address(), $value, REQUEST_TIME);
   }
 
   return TRUE;
@@ -172,10 +172,10 @@ function sess_destroy_sid($sid) {
       $params = session_get_cookie_params();
 
       if (version_compare(PHP_VERSION, '5.2.0') === 1) {
-        setcookie(session_name(), '', $_SERVER['REQUEST_TIME'] - 3600, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
+        setcookie(session_name(), '', REQUEST_TIME - 3600, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
       }
       else {
-        setcookie(session_name(), '', $_SERVER['REQUEST_TIME'] - 3600, $params['path'], $params['domain'], $params['secure']);      
+        setcookie(session_name(), '', REQUEST_TIME - 3600, $params['path'], $params['domain'], $params['secure']);      
       }
       unset($_COOKIE[session_name()]);
     }
@@ -198,7 +198,7 @@ function sess_gc($lifetime) {
   // for three weeks before deleting them, you need to set gc_maxlifetime
   // to '1814400'. At that value, only after a user doesn't log in after
   // three weeks (1814400 seconds) will his/her session be removed.
-  db_query("DELETE FROM {sessions} WHERE timestamp < %d", time() - $lifetime);
+  db_query("DELETE FROM {sessions} WHERE timestamp < %d", REQUEST_TIME - $lifetime);
 
   return TRUE;
 }

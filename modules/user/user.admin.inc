@@ -188,8 +188,8 @@ function user_admin_account() {
     }
     asort($users_roles);
     $form['roles'][$account->uid][0] = array('#value' => theme('item_list', $users_roles));
-    $form['member_for'][$account->uid] = array('#value' => format_interval(time() - $account->created));
-    $form['last_access'][$account->uid] =  array('#value' => $account->access ? t('@time ago', array('@time' => format_interval(time() - $account->access))) : t('never'));
+    $form['member_for'][$account->uid] = array('#value' => format_interval(REQUEST_TIME - $account->created));
+    $form['last_access'][$account->uid] =  array('#value' => $account->access ? t('@time ago', array('@time' => format_interval(REQUEST_TIME - $account->access))) : t('never'));
     $form['operations'][$account->uid] = array('#value' => l(t('edit'), "user/$account->uid/edit", array('query' => $destination)));
   }
   $form['accounts'] = array(

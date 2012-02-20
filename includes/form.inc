@@ -226,9 +226,9 @@ function form_set_cache($form_build_id, $form, $form_state) {
   if ($user->uid) {
     $form['#cache_token'] = drupal_get_token();
   }
-  cache_set('form_'. $form_build_id, $form, 'cache_form', time() + $expire);
+  cache_set('form_'. $form_build_id, $form, 'cache_form', REQUEST_TIME + $expire);
   if (!empty($form_state['storage'])) {
-    cache_set('storage_'. $form_build_id, $form_state['storage'], 'cache_form', time() + $expire);
+    cache_set('storage_'. $form_build_id, $form_state['storage'], 'cache_form', REQUEST_TIME + $expire);
   }
 }
 
@@ -1680,9 +1680,9 @@ function theme_date($element) {
 function expand_date($element) {
   // Default to current date
   if (empty($element['#value'])) {
-    $element['#value'] = array('day' => format_date(time(), 'custom', 'j'),
-                            'month' => format_date(time(), 'custom', 'n'),
-                            'year' => format_date(time(), 'custom', 'Y'));
+    $element['#value'] = array('day' => format_date(REQUEST_TIME, 'custom', 'j'),
+                            'month' => format_date(REQUEST_TIME, 'custom', 'n'),
+                            'year' => format_date(REQUEST_TIME, 'custom', 'Y'));
   }
 
   $element['#tree'] = TRUE;
@@ -2535,7 +2535,7 @@ function batch_process($redirect = NULL, $url = NULL) {
 
       // Initiate db storage in order to get a batch id. We have to provide
       // at least an empty string for the (not null) 'token' column.
-      db_query("INSERT INTO {batch} (token, timestamp) VALUES ('', %d)", time());
+      db_query("INSERT INTO {batch} (token, timestamp) VALUES ('', %d)", REQUEST_TIME);
       $batch['id'] = db_last_insert_id('batch', 'bid');
 
       // Now that we have a batch id, we can generate the redirection link in

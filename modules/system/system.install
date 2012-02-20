@@ -142,7 +142,7 @@ function system_requirements($phase) {
 
     // Determine severity based on time since cron last ran.
     $severity = REQUIREMENT_OK;
-    if (time() - $cron_last > $threshold_error) {
+    if (REQUEST_TIME - $cron_last > $threshold_error) {
       $severity = REQUIREMENT_ERROR;
     }
     else if ($never_run) {
@@ -155,7 +155,7 @@ function system_requirements($phase) {
         $severity = REQUIREMENT_WARNING;
       }
     }
-    else if (time() - $cron_last > $threshold_warning) {
+    else if (REQUEST_TIME - $cron_last > $threshold_warning) {
       $severity = REQUIREMENT_WARNING;
     }
 
@@ -172,7 +172,7 @@ function system_requirements($phase) {
       $description = $t('Cron has not run.') .' '. $help;
     }
     else {
-      $summary = $t('Last run !time ago', array('!time' => format_interval(time() - $cron_last)));
+      $summary = $t('Last run !time ago', array('!time' => format_interval(REQUEST_TIME - $cron_last)));
       $description = '';
       if ($severity != REQUIREMENT_OK) {
         $description = $t('Cron has not run recently.') .' '. $help;
@@ -385,7 +385,7 @@ function system_install() {
   // presumed to be a serialized array. Install will change uid 1 immediately
   // anyways. So we insert the superuser here, the uid is 2 here for now, but
   // very soon it will be changed to 1.
-  db_query("INSERT INTO {users} (uid, name, mail, created, data) VALUES(%d, '%s', '%s', %d, '%s')", 2, 'placeholder-for-uid-1', 'placeholder-for-uid-1', time(), serialize(array()));
+  db_query("INSERT INTO {users} (uid, name, mail, created, data) VALUES(%d, '%s', '%s', %d, '%s')", 2, 'placeholder-for-uid-1', 'placeholder-for-uid-1', REQUEST_TIME, serialize(array()));
 
   // This sets the above two users uid 0 (anonymous). We avoid an explicit 0
   // otherwise MySQL might insert the next auto_increment value.

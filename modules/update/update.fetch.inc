@@ -77,14 +77,14 @@ function _update_refresh() {
       }
     }
     $frequency = variable_get('update_check_frequency', 1);
-    _update_cache_set('update_available_releases', $available, time() + (60 * 60 * 24 * $frequency));
+    _update_cache_set('update_available_releases', $available, REQUEST_TIME + (60 * 60 * 24 * $frequency));
     watchdog('update', 'Attempted to fetch information about all available new releases and updates.', array(), WATCHDOG_NOTICE, l(t('view'), 'admin/reports/updates'));
   }
   else {
     watchdog('update', 'Unable to fetch any information about available new releases and updates.', array(), WATCHDOG_ERROR, l(t('view'), 'admin/reports/updates'));
   }
   // Whether this worked or not, we did just (try to) check for updates.
-  variable_set('update_last_check', time());
+  variable_set('update_last_check', REQUEST_TIME);
   return $available;
 }
 
