@@ -223,15 +223,8 @@ define('LANGUAGE_RTL', 1);
 
 /**
  * Time of the current request in seconds elapsed since the Unix Epoch.
- *
- * This differs from $_SERVER['REQUEST_TIME'], which is stored as a float
- * since PHP 5.4.0. Float timestamps confuse most PHP functions
- * (including date_create()).
- *
- * @see http://php.net/manual/reserved.variables.server.php
- * @see http://php.net/manual/function.time.php
  */
-define ('REQUEST_TIME', (int) $_SERVER['REQUEST_TIME']);
+define ('REQUEST_TIME', $_SERVER['REQUEST_TIME']);
 
 // Hide E_DEPRECATED messages.
 if (defined('E_DEPRECATED')) {
