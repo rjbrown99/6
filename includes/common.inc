@@ -1761,10 +1761,10 @@ function base_path() {
 }
 
 /**
- * Provide a substitute clone() function for PHP4.
+ * Legacy: Originally provided a substitute clone() function for PHP4.
  */
 function drupal_clone($object) {
-  return version_compare(phpversion(), '5.0') < 0 ? $object : clone($object);
+  return clone($object);
 }
 
 /**
