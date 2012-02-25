@@ -1,0 +1,860 @@
+Index: modules/user_load_cache/user_load_cache.module
+===================================================================
+--- modules/user_load_cache/user_load_cache.module	(revision 0)
++++ modules/user_load_cache/user_load_cache.module	(revision 0)
+@@ -0,0 +1,310 @@
++<?php
++
++/**
++ * @file
++ *  Add static and persistent caching to user_load().
++ */
++
++/**
++ * Implementation of hook_user_load_cache_load().
++ *
++ * Fetch a user object.
++ *
++ * @param $array
++ *   An associative array of attributes to search for in selecting the
++ *   user, such as user name or e-mail address.
++ * @param $reset
++ *   (optional) Resets the static user cache, necessary when the user account
++ *   has been saved.
++ *
++ * @return
++ *   A fully-loaded $user object upon successful user load or FALSE if user
++ *   cannot be loaded.
++ */
++function user_load_cache_user_load_cache_load($array = array(), $reset = FALSE) {
++  // Dynamically compose a SQL query:
++  $query = array();
++  $params = array();
++
++  // Retrieve user from cache
++  if (count($array) === 1 && isset($array['uid']) && $array['uid']) {
++    $cid = 'user/' . $array['uid'];
++    $cache = cache_get($cid, 'cache_user');
++    if (is_object($cache)) {
++      return $cache->data;
++    }
++  }
++  else {
++    $cid = 0;
++  }
++
++  foreach ($array as $key => $value) {
++    if ($key == 'uid' || $key == 'status') {
++      $query[] = "$key = %d";
++      $params[] = $value;
++    }
++    else if ($key == 'pass') {
++      $query[] = "pass = '%s'";
++      $params[] = md5($value);
++    }
++    else {
++      $query[]= "$key = '%s'";
++      $params[] = $value;
++    }
++  }
++  $result = db_query('SELECT * FROM {users} u WHERE '. implode(' AND ', $query), $params);
++
++  if ($user = db_fetch_object($result)) {
++    $user = drupal_unpack($user);
++
++    $user->roles = array();
++    if ($user->uid) {
++      $user->roles[DRUPAL_AUTHENTICATED_RID] = 'authenticated user';
++    }
++    else {
++      $user->roles[DRUPAL_ANONYMOUS_RID] = 'anonymous user';
++    }
++    $result = db_query('SELECT r.rid, r.name FROM {role} r INNER JOIN {users_roles} ur ON ur.rid = r.rid WHERE ur.uid = %d', $user->uid);
++    while ($role = db_fetch_object($result)) {
++      $user->roles[$role->rid] = $role->name;
++    }
++    user_module_invoke('load', $array, $user);
++  }
++  else {
++    $user = FALSE;
++  }
++
++  if ($user->uid && $cid) {
++    // Add the user to the persistent cache.
++    cache_set($cid, $user, 'cache_user');
++  }
++
++  return $user;
++}
++
++/**
++ * Implementation of hook_user_load_cache_save().
++ */
++function user_load_cache_user_load_cache_save($account, $array = array(), $category = 'account') {
++  // Dynamically compose a SQL query:
++  $user_fields = user_fields();
++  if (is_object($account) && $account->uid) {
++    $cid = "user/$account->uid";
++    user_module_invoke('update', $array, $account, $category);
++    $query = '';
++    $data = unserialize(db_result(db_query('SELECT data FROM {users} WHERE uid = %d', $account->uid)));
++    // Consider users edited by an administrator as logged in, if they haven't
++    // already, so anonymous users can view the profile (if allowed).
++    if (empty($array['access']) && empty($account->access) && user_access('administer users')) {
++      $array['access'] = time();
++    }
++    foreach ($array as $key => $value) {
++      if ($key == 'pass' && !empty($value)) {
++        $query .= "$key = '%s', ";
++        $v[] = md5($value);
++      }
++      else if ((substr($key, 0, 4) !== 'auth') && ($key != 'pass')) {
++        if (in_array($key, $user_fields)) {
++          // Save standard fields.
++          $query .= "$key = '%s', ";
++          $v[] = $value;
++        }
++        else if ($key != 'roles') {
++          // Roles is a special case: it used below.
++          if ($value === NULL) {
++            unset($data[$key]);
++          }
++          elseif (!empty($key)) {
++            $data[$key] = $value;
++          }
++        }
++      }
++    }
++    $query .= "data = '%s' ";
++    $v[] = serialize($data);
++
++    $success = db_query("UPDATE {users} SET $query WHERE uid = %d", array_merge($v, array($account->uid)));
++    if (!$success) {
++      // The query failed - better to abort the save than risk further data loss.
++      return FALSE;
++    }
++
++    // Reload user roles if provided.
++    if (isset($array['roles']) && is_array($array['roles'])) {
++      db_query('DELETE FROM {users_roles} WHERE uid = %d', $account->uid);
++
++      foreach (array_keys($array['roles']) as $rid) {
++        if (!in_array($rid, array(DRUPAL_ANONYMOUS_RID, DRUPAL_AUTHENTICATED_RID))) {
++          db_query('INSERT INTO {users_roles} (uid, rid) VALUES (%d, %d)', $account->uid, $rid);
++        }
++      }
++    }
++
++    // Delete a blocked user's sessions to kick them if they are online.
++    if (isset($array['status']) && $array['status'] == 0) {
++      sess_destroy_uid($account->uid);
++    }
++
++    // If the password changed, delete all open sessions and recreate
++    // the current one.
++    if (!empty($array['pass'])) {
++      sess_destroy_uid($account->uid);
++      if ($account->uid == $GLOBALS['user']->uid) {
++        sess_regenerate();
++      }
++    }
++
++    // Flush user from cache.
++    cache_clear_all($cid, 'cache_user');
++
++    // Refresh user object.
++    $user = user_load(array('uid' => $account->uid), TRUE);
++
++    // Send emails after we have the new user object.
++    if (isset($array['status']) && $array['status'] != $account->status) {
++      // The user's status is changing; conditionally send notification email.
++      $op = $array['status'] == 1 ? 'status_activated' : 'status_blocked';
++      _user_mail_notify($op, $user);
++    }
++
++    user_module_invoke('after_update', $array, $user, $category);
++  }
++  else {
++    // Allow 'created' to be set by the caller.
++    if (!isset($array['created'])) {
++      $array['created'] = time();
++    }
++    // Consider users created by an administrator as already logged in, so
++    // anonymous users can view the profile (if allowed).
++    if (empty($array['access']) && user_access('administer users')) {
++      $array['access'] = time();
++    }
++
++    // Note: we wait to save the data column to prevent module-handled
++    // fields from being saved there. We cannot invoke hook_user('insert') here
++    // because we don't have a fully initialized user object yet.
++    foreach ($array as $key => $value) {
++      switch ($key) {
++        case 'pass':
++          $fields[] = $key;
++          $values[] = md5($value);
++          $s[] = "'%s'";
++          break;
++        case 'mode':       case 'sort':     case 'timezone':
++        case 'threshold':  case 'created':  case 'access':
++        case 'login':      case 'status':
++          $fields[] = $key;
++          $values[] = $value;
++          $s[] = "%d";
++          break;
++        default:
++          if (substr($key, 0, 4) !== 'auth' && in_array($key, $user_fields)) {
++            $fields[] = $key;
++            $values[] = $value;
++            $s[] = "'%s'";
++          }
++          break;
++      }
++    }
++    $success = db_query('INSERT INTO {users} ('. implode(', ', $fields) .') VALUES ('. implode(', ', $s) .')', $values);
++    if (!$success) {
++      // On a failed INSERT some other existing user's uid may be returned.
++      // We must abort to avoid overwriting their account.
++      return FALSE;
++    }
++
++    // Build the initial user object.
++    $array['uid'] = db_last_insert_id('users', 'uid');
++    $user = user_load(array('uid' => $array['uid']), TRUE);
++
++    $cid = 'user/' . $array['uid'];
++    user_module_invoke('insert', $array, $user, $category);
++
++    // Build and save the serialized data field now.
++    $data = array();
++    foreach ($array as $key => $value) {
++      if ((substr($key, 0, 4) !== 'auth') && ($key != 'roles') && (!in_array($key, $user_fields)) && ($value !== NULL)) {
++        $data[$key] = $value;
++      }
++    }
++    db_query("UPDATE {users} SET data = '%s' WHERE uid = %d", serialize($data), $user->uid);
++
++    // Save user roles (delete just to be safe).
++    if (isset($array['roles']) && is_array($array['roles'])) {
++      db_query('DELETE FROM {users_roles} WHERE uid = %d', $array['uid']);
++      foreach (array_keys($array['roles']) as $rid) {
++        if (!in_array($rid, array(DRUPAL_ANONYMOUS_RID, DRUPAL_AUTHENTICATED_RID))) {
++          db_query('INSERT INTO {users_roles} (uid, rid) VALUES (%d, %d)', $array['uid'], $rid);
++        }
++      }
++    }
++
++    // Flush user from cache.
++    cache_clear_all($cid, 'cache_user');
++
++    // Build the finished user object.
++    $user = user_load(array('uid' => $array['uid']), TRUE);
++  }
++
++  // Save distributed authentication mappings.
++  $authmaps = array();
++  foreach ($array as $key => $value) {
++    if (substr($key, 0, 4) == 'auth') {
++      $authmaps[$key] = $value;
++    }
++  }
++  if (sizeof($authmaps) > 0) {
++    user_set_authmaps($user, $authmaps);
++  }
++  cache_clear_all($cid, 'cache_user');
++
++  return $user;
++}
++
++
++/**
++ * Clear the user_load() cache.
++ *
++ * $param $uid
++ *  The user ID.
++ */
++function user_load_cache_clear($uid) {
++  cache_clear_all("user/$uid", 'cache_user');
++  // memcache-session.inc caches the user object too, ensure that gets cleared.
++  cache_clear_all($uid, 'users');
++}
++
++/**
++ * Implementation of hook_user().
++ */
++function user_load_cache_user($op, &$edit, &$account, $category = NULL) {
++  if ($op == 'update' || $op == 'delete' || $op == 'login') {
++    user_load_cache_clear($account->uid);
++  }
++}
++
++/**
++ * Implementation of hook_flush_caches().
++ */
++function user_load_cache_flush_caches() {
++  return array('cache_user');
++}
++
++/**
++ * Implementation of hook_form_FORM_ID_alter().
++ *
++ * @todo: is this necessary?
++ */
++function user_load_cache_form_user_profile_form_alter(&$form, &$form_state) {
++  $form['#submit'][] = '_user_load_cache_profile_form_submit';
++}
++
++/**
++ * Submit handler for the user profile form.
++ */
++function _user_load_cache_profile_form_submit($form, &$form_state) {
++  if (user_access('select different theme')) {
++    // This prevents the system theme from getting corrupted.
++    init_theme();
++  }
++}
+
+Property changes on: modules/user_load_cache/user_load_cache.module
+___________________________________________________________________
+Added: svn:keywords
+   + Id
+
+Index: modules/user_load_cache/user_load_cache.install
+===================================================================
+--- modules/user_load_cache/user_load_cache.install	(revision 0)
++++ modules/user_load_cache/user_load_cache.install	(revision 0)
+@@ -0,0 +1,30 @@
++<?php
++
++/**
++ * @file
++ * Install and update functions for user_load_cache module.
++ */
++
++/**
++ * Implements hook_schema().
++ */
++function user_load_cache_schema() {
++  $schema['cache_user'] = drupal_get_schema_unprocessed('system', 'cache');
++  $schema['cache_user']['description'] = 'Cache bin for user objects.';
++
++  return $schema;
++}
++
++/**
++ * Implements hook_install().
++ */
++function user_load_cache_install() {
++  drupal_install_schema('user_load_cache');
++}
++
++/**
++ * Implements hook_uninstall().
++ */
++function user_load_cache_uninstall() {
++  drupal_uninstall_schema('user_load_cache');
++}
+
+Property changes on: modules/user_load_cache/user_load_cache.install
+___________________________________________________________________
+Added: svn:keywords
+   + Id
+
+Index: modules/user_load_cache/user_load_cache.info
+===================================================================
+--- modules/user_load_cache/user_load_cache.info	(revision 0)
++++ modules/user_load_cache/user_load_cache.info	(revision 0)
+@@ -0,0 +1,4 @@
++name = User load caching
++description = Static and persistent caching for users.
++core = 6.x
++package = Pressflow
+
+Property changes on: modules/user_load_cache/user_load_cache.info
+___________________________________________________________________
+Added: svn:keywords
+   + Id
+
+Index: modules/node_load_cache/node_load_cache.info
+===================================================================
+--- modules/node_load_cache/node_load_cache.info	(revision 0)
++++ modules/node_load_cache/node_load_cache.info	(revision 0)
+@@ -0,0 +1,4 @@
++name = Node load cache
++description = Peristent caching for nodes.
++core = 6.x
++package = Pressflow
+
+Property changes on: modules/node_load_cache/node_load_cache.info
+___________________________________________________________________
+Added: svn:keywords
+   + Id
+
+Index: modules/node_load_cache/node_load_cache.module
+===================================================================
+--- modules/node_load_cache/node_load_cache.module	(revision 0)
++++ modules/node_load_cache/node_load_cache.module	(revision 0)
+@@ -0,0 +1,206 @@
++<?php
++
++/**
++ * @file
++ * Persistent caching for node_load().
++ */
++
++/**
++ * Implementation of hook_node_load_cache().
++ *
++ * Load a node object from the database.
++ *
++ * @param $param
++ *   Either the nid of the node or an array of conditions to match against in the database query
++ * @param $revision
++ *   Which numbered revision to load. Defaults to the current version.
++ * @param $reset
++ *   Whether to reset the internal node_load cache.
++ *
++ * @return
++ *   A fully-populated node object.
++ */
++function node_load_cache_node_load_cache($param = array(), $revision = NULL, $reset = NULL) {
++  global $user;
++  static $nodes = array();
++
++  $cacheable = ($revision == NULL && is_numeric($param)) ? "node/$param" : 0;
++  if ($reset) {
++    $nodes = array();
++    if ($cacheable) {
++      node_load_cache_clear($param);
++    }
++  }
++
++  $arguments = array();
++  if (is_numeric($param)) {
++    if ($cacheable) {
++      // Is the node statically cached?
++      if (isset($nodes[$param])) {
++        return is_object($nodes[$param]) ? drupal_clone($nodes[$param]) : $nodes[$param];
++      }
++      $cache = cache_get($cacheable, 'cache_node');
++      if (is_object($cache)) {
++        $cache = $cache->data;
++        // Cache the node statically so we don't have to re-request.
++        $nodes[$param] = is_object($cache) ? drupal_clone($cache) : $cache;
++        // Node types like polls need to do some custom logic when users are
++        // logged in and are more difficult to cache.  We still get benefit
++        // from caching these node types for anonymous users.
++        if (!(in_array($nodes[$param]->type, variable_get('cache_node_anonymous_types', array('poll'))) && $user->uid)) {
++          return drupal_clone($nodes[$param]);
++        }
++      }
++    }
++    $cond = 'n.nid = %d';
++    $arguments[] = $param;
++  }
++  elseif (is_array($param)) {
++    // Turn the conditions into a query.
++    foreach ($param as $key => $value) {
++      $cond[] = 'n.'. db_escape_table($key) ." = '%s'";
++      $arguments[] = $value;
++    }
++    $cond = implode(' AND ', $cond);
++  }
++  else {
++    return FALSE;
++  }
++
++  // Retrieve a field list based on the site's schema.
++  $fields = drupal_schema_fields_sql('node', 'n');
++  $fields = array_merge($fields, drupal_schema_fields_sql('node_revisions', 'r'));
++  $fields = array_merge($fields, array('u.name', 'u.picture', 'u.data'));
++  // Remove fields not needed in the query: n.vid and r.nid are redundant,
++  // n.title is unnecessary because the node title comes from the
++  // node_revisions table.  We'll keep r.vid, r.title, and n.nid.
++  $fields = array_diff($fields, array('n.vid', 'n.title', 'r.nid'));
++  $fields = implode(', ', $fields);
++  // Rename timestamp field for clarity.
++  $fields = str_replace('r.timestamp', 'r.timestamp AS revision_timestamp', $fields);
++  // Change name of revision uid so it doesn't conflict with n.uid.
++  $fields = str_replace('r.uid', 'r.uid AS revision_uid', $fields);
++
++  // Retrieve the node.
++  // No db_rewrite_sql is applied so as to get complete indexing for search.
++  if ($revision) {
++    array_unshift($arguments, $revision);
++    $node = db_fetch_object(db_query('SELECT '. $fields .' FROM {node} n INNER JOIN {users} u ON u.uid = n.uid INNER JOIN {node_revisions} r ON r.nid = n.nid AND r.vid = %d WHERE '. $cond, $arguments));
++  }
++  else {
++    $node = db_fetch_object(db_query('SELECT '. $fields .' FROM {node} n INNER JOIN {users} u ON u.uid = n.uid INNER JOIN {node_revisions} r ON r.vid = n.vid WHERE '. $cond, $arguments));
++  }
++
++  if ($node && $node->nid) {
++    // Call the node specific callback (if any) and piggy-back the
++    // results to the node or overwrite some values.
++    if ($extra = node_invoke($node, 'load')) {
++      foreach ($extra as $key => $value) {
++        $node->$key = $value;
++      }
++    }
++
++    if ($extra = node_invoke_nodeapi($node, 'load')) {
++      foreach ($extra as $key => $value) {
++        $node->$key = $value;
++      }
++    }
++    if ($cacheable) {
++      // To completely exclude a node type from the cache, add it to the
++      // cache_node_exclude_types variable (as an array).  To exclude a
++      // node type from the cache only for logged in users, add it to the
++      // cache_node_anyonmous_types variable (as an array).
++      if (!in_array($node->type, variable_get('cache_node_exclude_types', array())) || ($user->uid && !in_array($node->type, variable_get('cache_node_anonymous_types', array('poll'))))) {
++        cache_set($cacheable, $node, 'cache_node');
++      }
++      $nodes[$node->nid] = is_object($node) ? drupal_clone($node) : $node;
++    }
++  }
++
++  return $node;
++}
++
++/**
++ * Clear the persistent cache for a node.
++ *
++ * @param $nid
++ *   The node ID.
++ */
++function node_load_cache_clear($nid) {
++  cache_clear_all("node/$nid", 'cache_node');
++}
++
++/**
++ * Clear nodes that are related to the node being cleared.
++ */
++function node_load_cache_clear_related($node) {
++  // Support for translation module.
++  if (module_exists('translation') && translation_supported_type($node->type) && !empty($node->tnid)) {
++    $translations = translation_node_get_translations($node->tnid);
++    foreach ($translations as $translation) {
++      node_load_cache_clear($translation->nid);
++    }
++  }
++}
++
++/**
++ * Implements hook_nodeapi().
++ */
++function node_load_cache_nodeapi(&$node, $op, $a3, $a4) {
++  if ($op == 'update' || $op == 'delete') {
++    node_load_cache_clear($node->nid);
++    node_load_cache_clear_related($node);
++  }
++  if ($op == 'insert') {
++    node_load_cache_clear_related($node);
++  }
++}
++
++/**
++ * Implements hook_comment().
++ */
++function node_load_cache_comment(&$a1, $op) {
++  // Insert and update ops get passed an array.
++  if ($op == 'insert' || $op == 'update') {
++    node_load_cache_clear($a1['nid']);
++  }
++  // Delete op gets an object.
++  if ($op == 'delete') {
++    node_load_cache_clear($a1->nid);
++  }
++}
++
++/**
++ * Implements hook_user().
++ */
++function node_load_cache_user($op, &$edit, &$account, $category = NULL) {
++  // User module adds name, picture and other values to the node object
++  // in hook_node_load(). Clear the node cache when changes are made.
++  if ($op == 'update' || $op == 'delete') {
++    $result = db_query('SELECT nid FROM {node} WHERE uid = %d', $account->uid);
++    while ($record = db_fetch_object($result)) {
++      node_load_cache_clear($record->nid);
++    }
++  }
++}
++
++/**
++ * Implementation of hook_flush_caches().
++ */
++function node_load_cache_flush_caches() {
++  return array('cache_node');
++}
++
++/**
++ * Implements hook_form_FORM_ID_alter().
++ */
++function node_load_cache_poll_view_voting_form_alter(&$form, &$form_state) {
++  $form['vote']['#submit'][] = '_node_load_cache_poll_vote_submit';
++}
++
++/**
++ * Clear the node_load() cache when a poll vote is submitted.
++ */
++function _node_load_cache_poll_vote_submit($form, &$form_state) {
++  node_load_cache_clear($form['#node']->nid);
++}
+
+Property changes on: modules/node_load_cache/node_load_cache.module
+___________________________________________________________________
+Added: svn:keywords
+   + Id
+
+Index: modules/node_load_cache/node_load_cache.install
+===================================================================
+--- modules/node_load_cache/node_load_cache.install	(revision 0)
++++ modules/node_load_cache/node_load_cache.install	(revision 0)
+@@ -0,0 +1,39 @@
++<?php
++
++/**
++ * @file
++ * Install and update functions for node_load_cache module.
++ */
++
++/**
++ * Implements hook_schema().
++ */
++function node_load_cache_schema() {
++  $schema['cache_node'] = drupal_get_schema_unprocessed('system', 'cache');
++  $schema['cache_node']['description'] = 'Cache bin for node objects.';
++
++  return $schema;
++}
++
++/**
++ * Implements hook_install().
++ */
++function node_load_cache_install() {
++  drupal_install_schema('node_load_cache');
++  db_query("UPDATE {system} SET weight = 500 WHERE name = 'node_load_cache'");
++}
++
++/**
++ * Implements hook_uninstall().
++ */
++function node_load_cache_uninstall() {
++  drupal_uninstall_schema('node_load_cache');
++}
++
++/**
++ * Update module to set a heavier weight.
++ */
++function node_load_cache_update_6000() {
++  db_query("UPDATE {system} SET weight = 500 WHERE name = 'node_load_cache'");
++  return array();
++}
+
+Property changes on: modules/node_load_cache/node_load_cache.install
+___________________________________________________________________
+Added: svn:keywords
+   + Id
+
+Index: modules/node/node.module
+===================================================================
+--- modules/node/node.module	(revision 1920)
++++ modules/node/node.module	(working copy)
+@@ -694,6 +694,8 @@
+ }
+ 
+ /**
++ * Replacement for node_load() to redirect to an alternative function when available.
++ *
+  * Load a node object from the database.
+  *
+  * @param $param
+@@ -707,6 +709,43 @@
+  *   A fully-populated node object.
+  */
+ function node_load($param = array(), $revision = NULL, $reset = NULL) {
++  static $hook_module;
++  $hook = 'node_load_cache';
++
++  if (!isset($hook_module)) {
++    $modules = module_implements($hook);
++    if (!empty($modules)) {
++      $hook_module = reset($modules);
++    }
++    else {
++      $hook_module = FALSE;
++    }
++  }
++
++  if ($hook_module !== FALSE) {
++    $function = $hook_module . '_' . $hook;
++    $return = $function($param, $revision, $reset);
++  }
++   else {
++    $return = _node_load_direct($param, $revision, $reset);
++  }
++  return $return;
++}
++
++/**
++ * Load a node object from the database.
++ *
++ * @param $param
++ *   Either the nid of the node or an array of conditions to match against in the database query
++ * @param $revision
++ *   Which numbered revision to load. Defaults to the current version.
++ * @param $reset
++ *   Whether to reset the internal node_load cache.
++ *
++ * @return
++ *   A fully-populated node object.
++ */
++function _node_load_direct($param = array(), $revision = NULL, $reset = NULL) {
+   static $nodes = array();
+ 
+   if ($reset) {
+Index: modules/user/user.module
+===================================================================
+--- modules/user/user.module	(revision 1920)
++++ modules/user/user.module	(working copy)
+@@ -138,8 +138,72 @@
+ }
+ 
+ /**
++ * Replacement for user_load() to redirect to an alternative implementation when available.
++ *
+  * Fetch a user object.
+  *
++ * @param $array
++ *   An associative array of attributes to search for in selecting the
++ *   user, such as user name or e-mail address.
++ *
++ * @param $reset
++ *   Whether to reset the user_load() cache.
++ *
++ * @return
++ *   A fully-loaded $user object upon successful user load or FALSE if user
++ *   cannot be loaded.
++ */
++function user_load($array = array(), $reset = FALSE) {
++  static $hook_module;
++  static $user_cache = array();
++  $hook = 'user_load_cache_load';
++
++  if (is_numeric($array)) {
++    $array = array('uid' => $array);
++  }
++  elseif (!is_array($array)) {
++    return FALSE;
++  }
++
++  // Retrieve user from cache
++  if (count($array) === 1 && isset($array['uid']) && $array['uid']) {
++    if (!$reset && isset($user_cache[$array['uid']])) {
++      return $user_cache[$array['uid']];
++    }
++  }
++  else {
++    $cid = 0;
++  }
++
++  if (!isset($hook_module)) {
++    $modules = module_implements('user_load_cache_load');
++    if (!empty($modules)) {
++      $hook_module = reset($modules);
++    }
++    else {
++      $hook_module = FALSE;
++    }
++  }
++
++  if ($hook_module !== FALSE) {
++    $function = $hook_module . '_' . $hook;
++    $return = $function($array, $reset);
++  }
++   else {
++    $return = _user_load_direct($array);
++  }
++
++  if ($return && $return->uid) {
++    // Add the user to the static cache.
++    $user_cache[$return->uid] = $return;
++  }
++
++  return $return;
++}
++
++/**
++ * Fetch a user object.
++ *
+  * @param $user_info
+  *   Information about the user to load, consisting of one of the following:
+  *   - An associative array whose keys are fields in the {users} table (such as
+@@ -150,7 +214,7 @@
+  *   A fully-loaded $user object upon successful user load or FALSE if user
+  *   cannot be loaded.
+  */
+-function user_load($user_info = array()) {
++function _user_load_direct($user_info = array()) {
+   // Dynamically compose a SQL query:
+   $query = array();
+   $params = array();
+@@ -202,6 +266,8 @@
+ }
+ 
+ /**
++ * Replacement for user_save that redirects to an alternative implementation if available.
++ *
+  * Save changes to a user account or add a new user.
+  *
+  * @param $account
+@@ -223,6 +289,48 @@
+  *   A fully-loaded $user object upon successful save or FALSE if the save failed.
+  */
+ function user_save($account, $array = array(), $category = 'account') {
++  static $hook_module;
++  $hook = 'user_load_cache_save';
++
++  if (!isset($hook_module)) {
++    $modules = module_implements($hook);
++    if (!empty($modules)) {
++      $hook_module = reset($modules);
++    }
++    else {
++      $hook_module = FALSE;
++    }
++  }
++
++  if ($hook_module !== FALSE) {
++    $function = $hook_module . '_' . $hook;
++    $return = $function($account, $array, $category);
++  }
++   else {
++    $return = _user_save_direct($account, $array, $category);
++  }
++  return $return;
++}
++
++/**
++ * Save changes to a user account or add a new user.
++ *
++ * @param $account
++ *   The $user object for the user to modify or add. If $user->uid is
++ *   omitted, a new user will be added.
++ *
++ * @param $array
++ *   (optional) An array of fields and values to save. For example,
++ *   array('name' => 'My name'); Setting a field to NULL deletes it from
++ *   the data column.
++ *
++ * @param $category
++ *   (optional) The category for storing profile information in.
++ *
++ * @return
++ *   A fully-loaded $user object upon successful save or FALSE if the save failed.
++ */
++function _user_save_direct($account, $array = array(), $category = 'account') {
+   // Dynamically compose a SQL query:
+   $user_fields = user_fields();
+   if (is_object($account) && $account->uid) {
