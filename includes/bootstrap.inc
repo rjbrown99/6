@@ -1788,12 +1788,8 @@ function drupal_session_regenerate() {
   // stealing via XSS.
   extract(session_get_cookie_params());
 
-  if (version_compare(PHP_VERSION, '5.2.0') === 1) {
-    session_set_cookie_params($lifetime, $path, $domain, $secure, TRUE);
-  }
-  else {
-    session_set_cookie_params($lifetime, $path, $domain, $secure);
-  }
+  // PHP 5.2 and above only
+  session_set_cookie_params($lifetime, $path, $domain, $secure, TRUE);
 
   if (drupal_session_started()) {
     $old_session_id = session_id();

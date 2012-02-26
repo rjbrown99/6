@@ -171,12 +171,8 @@ function sess_destroy_sid($sid) {
     if (isset($_COOKIE[session_name()])) {
       $params = session_get_cookie_params();
 
-      if (version_compare(PHP_VERSION, '5.2.0') === 1) {
-        setcookie(session_name(), '', REQUEST_TIME - 3600, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
-      }
-      else {
-        setcookie(session_name(), '', REQUEST_TIME - 3600, $params['path'], $params['domain'], $params['secure']);      
-      }
+      // PHP 5.2+ only
+      setcookie(session_name(), '', REQUEST_TIME - 3600, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
       unset($_COOKIE[session_name()]);
     }
   }
