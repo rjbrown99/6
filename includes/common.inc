@@ -3894,7 +3894,9 @@ function _drupal_error_handler($error_level, $message, $filename, $line, $contex
       E_USER_WARNING => 'User warning',
       E_USER_NOTICE => 'User notice',
       E_STRICT => 'Strict warning',
-      E_RECOVERABLE_ERROR => 'Recoverable fatal error'
+      E_RECOVERABLE_ERROR => 'Recoverable fatal error',
+      E_DEPRECATED => 'Deprecated function',
+      E_USER_DEPRECATED => 'User deprecated function'
     );
     $caller = _drupal_get_last_caller(debug_backtrace());
 
