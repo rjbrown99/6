@@ -9,6 +9,7 @@ Index: modules/node/node.module
 -    $return['join'] = _node_access_join_sql($primary_table);
 -    $return['where'] = _node_access_where_sql();
 -    $return['distinct'] = 1;
++    $return = array();
 +    $where_sql = _node_access_where_sql();
 +    if ($where_sql) {
 +      $return['where'] = 'EXISTS (SELECT na.nid FROM {node_access} na WHERE ' . $primary_table . '.nid = na.nid AND (' . $where_sql . '))';
