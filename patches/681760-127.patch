@@ -1,27 +1,3 @@
-Index: patches/681760-127.patch
-===================================================================
---- patches/681760-127.patch	(revision 1980)
-+++ patches/681760-127.patch	(working copy)
-@@ -1,19 +0,0 @@
--Index: modules/node/node.module
--===================================================================
----- modules/node/node.module	(revision 1920)
--+++ modules/node/node.module	(working copy)
--@@ -2233,9 +2233,10 @@
--  */
-- function node_db_rewrite_sql($query, $primary_table, $primary_field) {
--   if ($primary_field == 'nid' && !node_access_view_all_nodes()) {
---    $return['join'] = _node_access_join_sql($primary_table);
---    $return['where'] = _node_access_where_sql();
---    $return['distinct'] = 1;
--+    $return = array();
--+    $where_sql = _node_access_where_sql();
--+    if ($where_sql) {
--+      $return['where'] = 'EXISTS (SELECT na.nid FROM {node_access} na WHERE ' . $primary_table . '.nid = na.nid AND (' . $where_sql . '))';
--+    }
--     return $return;
--   }
-- }
 Index: modules/node/node.module
 ===================================================================
 --- modules/node/node.module	(revision 1920)
