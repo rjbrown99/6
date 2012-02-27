@@ -95,12 +95,12 @@ function comment_update_6005() {
  */
 function comment_update_6006() {
   $ret = array();
-  db_drop_index($ret, 'comment', 'comment_uid');
-  db_drop_index($ret, 'comment', 'nid');
-  db_drop_index($ret, 'comment', 'pid');
-  db_drop_index($ret, 'comment', 'status');
-  db_add_index($ret, 'comment', 'comment_pid_status', array('pid', 'status'));
-  db_add_index($ret, 'comment', 'comment_num_new', array('nid', 'timestamp', 'status'));
+  db_drop_index($ret, 'comments', 'comment_uid');
+  db_drop_index($ret, 'comments', 'nid');
+  db_drop_index($ret, 'comments', 'pid');
+  db_drop_index($ret, 'comments', 'status');
+  db_add_index($ret, 'comments', 'comment_pid_status', array('pid', 'status'));
+  db_add_index($ret, 'comments', 'comment_num_new', array('nid', 'timestamp', 'status'));
   return $ret;
 }
 
