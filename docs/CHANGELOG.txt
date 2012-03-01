@@ -1,5 +1,8 @@
-Drupal 6.25-dev, xxxx-xx-xx (development release)
+Drupal 6.25, 2012-02-29
 ----------------------
+- Fixed regressions introduced in Drupal 6.24 only.
+- rjbrown99 note: Email regression not backed out, as we use the Drupal 7
+  and PHP 5+ method for valid_email_address().
 
 Drupal 6.24, 2012-02-01
 ----------------------
