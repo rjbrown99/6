@@ -6,6 +6,16 @@
  */
 
 /**
+ * Root directory from where drupal is installed on the sever
+ * it may be defined by something bootstraping drupal from outside
+ * so we only define it if needed
+ */
+if(!defined('DRUPAL_ROOT')){
+  $root = realpath(dirname(__FILE__)."/../");
+  define('DRUPAL_ROOT',$root);  
+}
+
+/**
  * Indicates that the item should never be removed unless explicitly told to
  * using cache_clear_all() with a cache ID.
  */
