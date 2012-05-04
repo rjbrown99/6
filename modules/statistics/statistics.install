@@ -47,6 +47,9 @@ function statistics_uninstall() {
  * Implementation of hook_schema().
  */
 function statistics_schema() {
+  $schema['cache_node_counter'] = drupal_get_schema_unprocessed('system', 'cache');
+  $schema['cache_node_counter']['description'] = 'Cache table for the Statistics module to store node views.';
+
   $schema['accesslog'] = array(
     'description' => 'Stores site access information for statistics.',
     'fields' => array(
@@ -128,6 +131,20 @@ function statistics_schema() {
 function statistics_update_6000() {
   $ret = array();
   db_change_field($ret, 'accesslog', 'url', 'url', array('type' => 'text', 'not null' => FALSE));
+  return $ret;
+}
+
+/**
+ * Create cache table.
+ */
+function statistics_update_6001() {
+  $ret = array();
+
+  // Create cache table.
+  $schema['cache_node_counter'] = drupal_get_schema_unprocessed('system', 'cache');
+  $schema['cache_node_counter']['description'] = t('Cache table for the Statistics module to store node views.');
+  db_create_table($ret, 'cache_node_counter', $schema['cache_node_counter']);
+
   return $ret;
 }
 

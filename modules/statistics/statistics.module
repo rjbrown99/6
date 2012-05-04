@@ -230,8 +230,17 @@ function statistics_title_list($dbfield, $dbrows) {
 function statistics_get($nid) {
 
   if ($nid > 0) {
-    // Retrieve an array with both totalcount and daycount.
-    $statistics = db_fetch_array(db_query('SELECT totalcount, daycount, timestamp FROM {node_counter} WHERE nid = %d', $nid));
+    $cache = cache_get('statistics_' . $nid, 'cache_node_counter');
+    if ($cache && isset($cache->data)) {
+      $statistics = $cache->data;
+    }
+    else {
+      // Retrieve an array with both totalcount and daycount.
+      $statistics =  db_fetch_array(db_query('SELECT totalcount, daycount, timestamp FROM {node_counter} WHERE nid = %d', $nid));
+      // 15 minute expiration
+      $expires = variable_get('statistics_get_cache_time', REQUEST_TIME + 900);
+      cache_set('statistics_' . $nid, 'cache_node_counter', $expires);
+    }
   }
 
   return $statistics;
