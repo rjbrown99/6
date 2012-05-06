@@ -453,6 +453,12 @@ function drupal_http_request($url, $headers = array(), $method = 'GET', $data = 
 
   $result = new stdClass();
 
+  // Custom: Add custom param to Newrelic
+  if (extension_loaded('newrelic')) { 
+    newrelic_add_custom_parameter('drupal_http_request_url', $url);
+    newrelic_add_custom_parameter('drupal_http_request_method', $method);
+  }
+
   // Parse the URL and make sure we can handle the schema.
   $uri = parse_url($url);
 
