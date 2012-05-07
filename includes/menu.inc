@@ -2377,8 +2377,9 @@ function _menu_router_build($callbacks) {
     watchdog('php', 'Menu router rebuild failed - some paths may not work correctly.', array(), WATCHDOG_ERROR);
     return array();
   }
-  // Delete the existing router since we have some data to replace it.
-  db_query('DELETE FROM {menu_router}');
+
+  $rows_new = array();
+
   // Apply inheritance rules.
   foreach ($menu as $path => $v) {
     $item = &$menu[$path];
@@ -2461,23 +2462,33 @@ function _menu_router_build($callbacks) {
     }
 
     $title_arguments = $item['title arguments'] ? serialize($item['title arguments']) : '';
-    db_query("INSERT INTO {menu_router}
-      (path, load_functions, to_arg_functions, access_callback,
-      access_arguments, page_callback, page_arguments, fit,
-      number_parts, tab_parent, tab_root,
-      title, title_callback, title_arguments,
-      type, block_callback, description, position, weight, file)
-      VALUES ('%s', '%s', '%s', '%s',
-      '%s', '%s', '%s', %d,
-      %d, '%s', '%s',
-      '%s', '%s', '%s',
-      %d, '%s', '%s', '%s', %d, '%s')",
-      $path, $item['load_functions'], $item['to_arg_functions'], $item['access callback'],
-      serialize($item['access arguments']), $item['page callback'], serialize($item['page arguments']), $item['_fit'],
-      $item['_number_parts'], $item['tab_parent'], $item['tab_root'],
-      $item['title'], $item['title callback'], $title_arguments,
-      $item['type'], $item['block callback'], $item['description'], $item['position'], $item['weight'], $item['include file']);
+
+    $rows_new[$path] = array(
+      'path'             => $path,
+      'load_functions'   => $item['load_functions'],
+      'to_arg_functions' => $item['to_arg_functions'],
+      'access_callback'  => $item['access callback'],
+      'access_arguments' => serialize($item['access arguments']),
+      'page_callback'    => $item['page callback'],
+      'page_arguments'   => serialize($item['page arguments']),
+      'fit'              => $item['_fit'],
+      'number_parts'     => $item['_number_parts'],
+      'tab_parent'       => $item['tab_parent'],
+      'tab_root'         => $item['tab_root'],
+      'title'            => $item['title'],
+      'title_callback'   => $item['title callback'],
+      'title_arguments'  => $title_arguments,
+      'type'             => $item['type'],
+      'block_callback'   => $item['block callback'],
+      'description'      => $item['description'],
+      'position'         => $item['position'],
+      'weight'           => $item['weight'],
+      'file'             => $item['include file'],
+    );
   }
+
+  _menu_router_save_table_contents($rows_new);
+
   // Sort the masks so they are in order of descending fit, and store them.
   $masks = array_keys($masks);
   rsort($masks);
@@ -2485,6 +2496,102 @@ function _menu_router_build($callbacks) {
 
   return $menu;
 }
+
+
+function _menu_router_save_table_contents($rows_new) {
+
+  // These placeholders will be used in the SQL queries.
+  $field_placeholders = array(
+    'path'              => "'%s'",
+    'load_functions'    => "'%s'",
+    'to_arg_functions'  => "'%s'",
+    'access_callback'   => "'%s'",
+    'access_arguments'  => "'%s'",
+    'page_callback'     => "'%s'",
+    'page_arguments'    => "'%s'",
+    'fit'               => '%d',
+    'number_parts'      => '%d',
+    'tab_parent'        => "'%s'",
+    'tab_root'          => "'%s'",
+    'title'             => "'%s'",
+    'title_callback'    => "'%s'",
+    'title_arguments'   => "'%s'",
+    'type'              => '%d',
+    'block_callback'    => "'%s'",
+    'description'       => "'%s'",
+    'position'          => "'%s'",
+    'weight'            => '%d',
+    'file'              => "'%s'",
+  );
+
+  // Determine the diff of new and old table contents.
+  $delete = array();
+  $update = array();
+  $insert = $rows_new;
+  $q = db_query("SELECT * FROM {menu_router}");
+  while ($row_old = db_fetch_array($q)) {
+    $path = $row_old['path'];
+    if (!isset($rows_new[$path])) {
+      $delete[$path] = TRUE;
+    }
+    else {
+      // Compare the old row with the new row.
+      $row_changes = array();
+      foreach ($row_old as $key => $value_old) {
+        if ($rows_new[$path][$key] != $value_old) {
+          $row_changes[$key] = $rows_new[$path][$key];
+        }
+      }
+      if (count($row_changes)) {
+        $update[$path] = $row_changes;
+      }
+    }
+    unset($insert[$path]);
+  }
+
+  // Save the changes.
+
+  // Delete rows that no longer exist.
+  if ($n_delete = count($delete)) {
+    $placeholders_sql = implode(', ', array_fill(0, $n_delete, "'%s'"));
+    db_query("DELETE FROM {menu_router} WHERE path IN ($placeholders_sql)", array_keys($delete));
+  }
+
+  // Update rows that have changed.
+  if ($n_update = count($update)) {
+    foreach ($update as $path => $row_changes) {
+      $set_fragments = array();
+      $args = array();
+      foreach ($row_changes as $key => $value) {
+        $placeholder = $field_placeholders[$key];
+        $set_fragments[] = "$key = $placeholder";
+        $args[] = $value;
+      }
+      $set_sql = implode(', ', $set_fragments);
+      $args[] = $path;
+      db_query("UPDATE {menu_router} SET $set_sql WHERE path = '%s'", $args);
+    }
+  }
+
+  // Insert new rows, in chunks of 100.
+  if ($n_insert = count($insert)) {
+    $insert = array_values($insert);
+    $fieldnames_sql = implode(', ', array_keys($field_placeholders));
+    $row_sql = '(' . implode(', ', $field_placeholders) . ')';
+    $rows_sql = implode(', ', array_fill(0, 100, $row_sql));
+    for ($i = 0; $i < $n_insert; $i += 100) {
+      $args = array();
+      for ($j = 0; $i + $j < $n_insert && $j < 100; ++$j) {
+        $args = array_merge($args, array_values($insert[$i + $j]));
+      }
+      if ($j < 100) {
+        $rows_sql = implode(', ', array_fill(0, $j, $row_sql));
+      }
+      db_query("INSERT INTO {menu_router} ($fieldnames_sql) VALUES $rows_sql", $args);
+    }
+  }
+}
+
 
 /**
  * Returns TRUE if a path is external (e.g. http://example.com).
