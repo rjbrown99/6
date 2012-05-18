@@ -289,7 +289,7 @@ function file_copy(&$source, $dest = 0, $replace = FILE_EXISTS_RENAME) {
 
   $source = realpath($source);
   if (!file_exists($source)) {
-    drupal_set_message(t('The selected file %file could not be copied, because no file by that name exists. Please check that you supplied the correct filename.', array('%file' => $source)), 'error');
+    watchdog('file system', 'The selected file %file could not be copied, because no file by that name exists. Please check that you supplied the correct filename.', array('%file' => $source), WATCHDOG_ERROR);
     return 0;
   }
 
@@ -302,12 +302,12 @@ function file_copy(&$source, $dest = 0, $replace = FILE_EXISTS_RENAME) {
   // a 0 byte file. Which is bad. Real bad.
   if ($source != realpath($dest)) {
     if (!$dest = file_destination($dest, $replace)) {
-      drupal_set_message(t('The selected file %file could not be copied, because a file by that name already exists in the destination.', array('%file' => $source)), 'error');
+      watchdog('file system', 'The selected file %file could not be copied, because a file by that name already exists in the destination.', array('%file' => $source), WATCHDOG_ERROR);
       return FALSE;
     }
 
     if (!@copy($source, $dest)) {
-      drupal_set_message(t('The selected file %file could not be copied.', array('%file' => $source)), 'error');
+      watchdog('file system', 'The selected file %file could not be copied.', array('%file' => $source), WATCHDOG_ERROR);
       return 0;
     }
 
