@@ -147,12 +147,16 @@ function node_load_cache_clear_related($node) {
  * Implements hook_nodeapi().
  */
 function node_load_cache_nodeapi(&$node, $op, $a3, $a4) {
-  if ($op == 'update' || $op == 'delete') {
-    node_load_cache_clear($node->nid);
-    node_load_cache_clear_related($node);
-  }
-  if ($op == 'insert') {
-    node_load_cache_clear_related($node);
+  switch ($op) {
+    case 'update':
+    case 'delete':
+    case 'presave':
+      node_load_cache_clear($node->nid);
+      node_load_cache_clear_related($node);
+      break;
+    case 'insert':
+      node_load_cache_clear_related($node);
+      break;
   }
 }
 
