@@ -2478,8 +2478,8 @@ function _node_access_rebuild_batch_operation(&$context) {
   }
 
   // Multistep processing : report progress.
-  if (count($nids) == $limit && $context['sandbox']['progress'] != $context['sandbox']['max']) {
-    $context['finished'] = min(0.99, $context['sandbox']['progress'] / $context['sandbox']['max']);
+  if ($context['sandbox']['progress'] != $context['sandbox']['max']) {
+    $context['finished'] = $context['sandbox']['progress'] / $context['sandbox']['max'];
   }
 }
 
