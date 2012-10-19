@@ -940,8 +940,8 @@ function form_builder($form_id, $form, &$form_state) {
   if (isset($form['#after_build']) && !isset($form['#after_build_done'])) {
     foreach ($form['#after_build'] as $function) {
       $form = $function($form, $form_state);
-      $form['#after_build_done'] = TRUE;
     }
+    $form['#after_build_done'] = TRUE;
   }
 
   // Now that we've processed everything, we can go back to handle the funky
